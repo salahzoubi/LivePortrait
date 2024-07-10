@@ -19,7 +19,7 @@ from .config.inference_config import InferenceConfig
 from .config.crop_config import CropConfig
 from .utils.cropper import Cropper
 from .utils.camera import get_rotation_matrix
-from .utils.video import images2video, concat_frames
+from .utils.video import images2video, concat_frames, add_audio_to_video
 from .utils.crop import _transform_img, prepare_paste_back, paste_back
 from .utils.retargeting_utils import calc_lip_close_ratio
 from .utils.io import load_image_rgb, load_driving_info, resize_to_limit
@@ -174,17 +174,24 @@ class LivePortraitPipeline(object):
 
         mkdir(args.output_dir)
         wfp_concat = None
+        video_fps = cv2.VideoCapture(args.driving_info).get(cv2.CAP_PROP_FPS)
         if is_video(args.driving_info):
             frames_concatenated = concat_frames(I_p_lst, driving_rgb_lst, img_crop_256x256)
             # save (driving frames, source image, drived frames) result
             wfp_concat = osp.join(args.output_dir, f'{basename(args.source_image)}--{basename(args.driving_info)}_concat.mp4')
-            images2video(frames_concatenated, wfp=wfp_concat)
+            images2video(frames_concatenated, wfp=wfp_concat, fps=video_fps)
+            if args.flag_add_sound:
+                wfp_concat_sound = osp.join(args.output_dir, f'{basename(args.source_image)}--{basename(args.driving_info)}_concat--sound.mp4')
+                add_audio_to_video(wfp_concat, args.driving_info, wfp_concat_sound)
 
         # save drived result
         wfp = osp.join(args.output_dir, f'{basename(args.source_image)}--{basename(args.driving_info)}.mp4')
         if inference_cfg.flag_pasteback:
-            images2video(I_p_paste_lst, wfp=wfp)
+            images2video(I_p_paste_lst, wfp=wfp, fps=video_fps)
         else:
-            images2video(I_p_lst, wfp=wfp)
+            images2video(I_p_lst, wfp=wfp, fps=video_fps)
+            if args.flag_add_sound:
+                wfp_sound = osp.join(args.output_dir, f'{basename(args.source_image)}--{basename(args.driving_info)}--sound.mp4')
+                add_audio_to_video(wfp, args.driving_info, wfp_sound)
 
         return wfp, wfp_concat
